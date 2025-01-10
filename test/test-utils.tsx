@@ -1,6 +1,6 @@
 import React from 'react'
 import { render as rtlRender, RenderResult } from '@testing-library/react'
-import { configureStore } from '@reduxjs/toolkit'
+import { configureStore, combineReducers } from '@reduxjs/toolkit'
 import { Provider } from 'react-redux'
 import dashboardReducer from '@/redux/features/dashboardSlice'
 import transactionReducer from '@/redux/features/transactions/transactionSlice'
@@ -11,20 +11,22 @@ interface ExtendedRenderOptions {
   store?: ReturnType<typeof configureStore>
 }
 
-type ExtendedRenderResult = RenderResult & {
+interface ExtendedRenderResult extends RenderResult {
   store: ReturnType<typeof configureStore>
 }
+
+const rootReducer = combineReducers({
+  dashboard: dashboardReducer,
+  transactions: transactionReducer,
+})
 
 function render(
   ui: React.ReactElement,
   {
-    preloadedState = {},
+    preloadedState,
     store = configureStore({
-      reducer: {
-        dashboard: dashboardReducer,
-        transactions: transactionReducer,
-      },
-      preloadedState,
+      reducer: rootReducer,
+      preloadedState: preloadedState as RootState,
     }),
     ...renderOptions
   }: ExtendedRenderOptions = {}
@@ -33,12 +35,12 @@ function render(
     return <Provider store={store}>{children}</Provider>
   }
 
-  const renderResult = rtlRender(ui, { wrapper: Wrapper, ...renderOptions })
+  const result = rtlRender(ui, { wrapper: Wrapper, ...renderOptions })
 
   return {
+    ...result,
     store,
-    ...renderResult,
-  } as ExtendedRenderResult
+  }
 }
 
 // Re-export everything
@@ -56,7 +58,7 @@ export const mockRevenueData = [
   { name: 'May', total: 150000 },
 ]
 
-export const mockInitialState = {
+export const mockInitialState: Partial<RootState> = {
   dashboard: {
     selectedTimeframe: '7days',
     revenueData: mockRevenueData,

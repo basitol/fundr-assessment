@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import DashboardPage from '../page'
-import { mockInitialState } from '@/test/test-utils'
+import { render, mockInitialState } from '@/test/test-utils'
+import { fetchDashboardData } from '@/redux/features/dashboardSlice'
 
 // Mock the chart component since we don't need to test its internal rendering
 jest.mock('@/components/dashboard/revenue-chart', () => ({
@@ -9,13 +10,16 @@ jest.mock('@/components/dashboard/revenue-chart', () => ({
 }))
 
 // Mock the date range picker for simplicity
-jest.mock('@/components/ui/date-range-picker', () => ({
-  DateRangePicker: () => <div data-testid="date-range-picker">Date Range Picker</div>,
+jest.mock('@/components/dashboard/date-range-picker', () => ({
+  DateRangePicker: () => <div>Date Range Picker</div>,
 }))
 
-// Mock the timeframe tabs
-jest.mock('@/components/ui/timeframe-tabs', () => ({
-  TimeframeTabs: () => <div data-testid="timeframe-tabs">Timeframe Tabs</div>,
+// Mock the async thunk
+jest.mock('@/redux/features/dashboardSlice', () => ({
+  ...jest.requireActual('@/redux/features/dashboardSlice'),
+  fetchDashboardData: jest.fn(() => ({
+    type: 'dashboard/fetchDashboardData/pending',
+  })),
 }))
 
 describe('DashboardPage', () => {
@@ -40,9 +44,7 @@ describe('DashboardPage', () => {
   })
 
   it('fetches dashboard data on mount', async () => {
-    const { store } = render(<DashboardPage />, {
-      preloadedState: mockInitialState,
-    })
+    render(<DashboardPage />, { preloadedState: mockInitialState })
 
     await waitFor(() => {
       expect(fetchDashboardData).toHaveBeenCalled()
@@ -51,62 +53,44 @@ describe('DashboardPage', () => {
 
   it('displays correct timeframe information', () => {
     render(<DashboardPage />, { preloadedState: mockInitialState })
-
-    expect(screen.getByTestId('timeframe-tabs')).toBeInTheDocument()
-    expect(screen.getByTestId('date-range-picker')).toBeInTheDocument()
+    expect(screen.getByText('vs Last 7days')).toBeInTheDocument()
   })
 
   it('handles positive and negative percentage changes correctly', () => {
-    const stateWithPositiveChange = {
-      ...mockInitialState,
-      dashboard: {
-        ...mockInitialState.dashboard,
-        percentageChange: 5.2,
-      },
-    }
-    const { rerender } = render(<DashboardPage />, {
-      preloadedState: stateWithPositiveChange,
-    })
-
-    expect(screen.getByText(/\+5\.2%/)).toBeInTheDocument()
-
-    const stateWithNegativeChange = {
-      ...mockInitialState,
-      dashboard: {
-        ...mockInitialState.dashboard,
-        percentageChange: -3.8,
-      },
-    }
-    rerender(<DashboardPage />)
+    // Test with negative percentage
     render(<DashboardPage />, {
-      preloadedState: stateWithNegativeChange,
+      preloadedState: {
+        dashboard: {
+          ...mockInitialState.dashboard!,
+          percentageChange: -2.5,
+        },
+      },
     })
 
-    expect(screen.getByText(/-3\.8%/)).toBeInTheDocument()
+    const negativePercentage = screen.getByText('-2.50%')
+    expect(negativePercentage).toHaveClass('text-red-500')
+
+    // Test with positive percentage
+    render(<DashboardPage />, { preloadedState: mockInitialState })
+    const positivePercentage = screen.getByText('+5.20%')
+    expect(positivePercentage).toHaveClass('text-green-500')
   })
 
   it('formats currency values correctly', () => {
-    const state = {
-      ...mockInitialState,
-      dashboard: {
-        ...mockInitialState.dashboard,
-        totalRevenue: 1550000,
-      },
-    }
-    render(<DashboardPage />, { preloadedState: state })
-
-    expect(screen.getByText(/\$1,550,000/)).toBeInTheDocument()
+    render(<DashboardPage />, { preloadedState: mockInitialState })
+    const formattedRevenue = screen.getByText('₦1,550,000')
+    expect(formattedRevenue).toBeInTheDocument()
   })
 
   it('handles loading state correctly', () => {
-    const loadingState = {
-      ...mockInitialState,
-      dashboard: {
-        ...mockInitialState.dashboard,
-        loading: true,
+    render(<DashboardPage />, {
+      preloadedState: {
+        dashboard: {
+          ...mockInitialState.dashboard!,
+          loading: true,
+        },
       },
-    }
-    render(<DashboardPage />, { preloadedState: loadingState })
+    })
 
     expect(screen.getByTestId('revenue-chart')).toBeInTheDocument()
   })
