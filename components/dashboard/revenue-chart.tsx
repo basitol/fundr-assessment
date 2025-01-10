@@ -18,7 +18,7 @@ export function RevenueChart({ chartData }: RevenueChartProps) {
   const chartConfig = {
     revenue: {
       label: 'Revenue',
-      color: 'hsl(var(--chart-1))',
+      color: '#FFC145',
     },
   } satisfies ChartConfig
 
